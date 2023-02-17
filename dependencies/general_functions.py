@@ -99,6 +99,9 @@ async def cadastra_custo():
     conn.commit()
     conn.close()
     logger.info("Valores digitados %s, %s, %s", typed_number, categoria, sub_categoria)
+    typed_number=''
+    categoria=''
+    sub_categoria=''
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
