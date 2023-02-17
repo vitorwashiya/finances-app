@@ -9,8 +9,19 @@ load_dotenv(dotenv_path=args.env_file)
 from dependencies.environment_variables import TOKEN_API, LISTA_CATEGORIAS, LISTA_ESSENCIAL, LISTA_LAZER
 from dependencies.general_functions import *
 
-CATEGORIAS_REGEX = "^(" + "|".join(LISTA_CATEGORIAS[0]) + ")$"
-SUB_CATEGORIAS_REGEX = "^(" + "|".join(LISTA_LAZER[0]) + "|" + "|".join(LISTA_ESSENCIAL[0]) + ")$"
+cat_list = []
+for listas in LISTA_CATEGORIAS:
+    cat_list.extend(listas)
+cat_list = list(set(cat_list))
+CATEGORIAS_REGEX = "^(" + "|".join(cat_list) + ")$"
+
+sub_cat_list = []
+for listas1 in LISTA_LAZER:
+    sub_cat_list.extend(listas)
+for listas2 in LISTA_ESSENCIAL:
+    sub_cat_list.extend(listas2)
+sub_cat_list = list(set(sub_cat_list))
+SUB_CATEGORIAS_REGEX = "^(" + "|".join(sub_cat_list) + ")$"
 
 from telegram import __version__ as TG_VER
 
