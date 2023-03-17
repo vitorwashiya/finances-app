@@ -6,8 +6,13 @@ parser.add_argument('--env-file', type=str, required=True)
 args = parser.parse_args()
 load_dotenv(dotenv_path=args.env_file)
 
-from dependencies.environment_variables import TOKEN_API, LISTA_CATEGORIAS, LISTA_ESSENCIAL, LISTA_LAZER
+from dependencies.environment_variables import TOKEN_API
 from dependencies.general_functions import *
+
+connector = DBConnector()
+
+LISTA_CATEGORIAS = connector.get_list_categorias()
+DICT_SUB_CATEGORIAS = connector.get_dict_sub_categorias()
 
 cat_list = []
 for listas in LISTA_CATEGORIAS:
@@ -16,10 +21,9 @@ cat_list = list(set(cat_list))
 CATEGORIAS_REGEX = "^(" + "|".join(cat_list) + ")$"
 
 sub_cat_list = []
-for listas1 in LISTA_LAZER:
-    sub_cat_list.extend(listas)
-for listas2 in LISTA_ESSENCIAL:
-    sub_cat_list.extend(listas2)
+for key in DICT_SUB_CATEGORIAS.keys():
+    for listas in DICT_SUB_CATEGORIAS[key]:
+        sub_cat_list.extend(listas)
 sub_cat_list = list(set(sub_cat_list))
 SUB_CATEGORIAS_REGEX = "^(" + "|".join(sub_cat_list) + ")$"
 

@@ -4,7 +4,7 @@ global sub_categoria
 import time
 import sqlite3
 
-from dependencies.environment_variables import LISTA_CATEGORIAS, LISTA_ESSENCIAL, LISTA_LAZER, DB_PATH
+from dependencies.db_connector import DBConnector, DB_PATH
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 import logging
 from telegram.ext import (
@@ -12,17 +12,15 @@ from telegram.ext import (
     ConversationHandler
 )
 
+connector = DBConnector()
+
 placeholders = {
-    "CATEGORIAS": ", ".join(LISTA_CATEGORIAS[0]) + "?",
-    "ESSENCIAL": ", ".join(LISTA_ESSENCIAL[0]) + "?",
-    "LAZER": ", ".join(LISTA_LAZER[0]) + "?"
+    "CATEGORIAS": "seleciona a categoria de custo",
+    "SUB_CATEGORIAS": "Selecione a subcategoria do custo",
 }
 
-listas = {
-    "CATEGORIAS": LISTA_CATEGORIAS,
-    "ESSENCIAL": LISTA_ESSENCIAL,
-    "LAZER": LISTA_LAZER
-}
+LISTA_CATEGORIAS = connector.get_list_categorias()
+DICT_SUB_CATEGORIAS = connector.get_dict_sub_categorias()
 
 # Enable logging
 logging.basicConfig(
@@ -59,12 +57,10 @@ async def categoria_custo(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     categoria = update.message.text
     user = update.message.from_user
     logger.info("Categoria de custo digitado por %s: %s", user.first_name, update.message.text)
-    if update.message.text in LISTA_CATEGORIAS[0]:
-        reply_keyboard = listas[update.message.text.upper()]
-        placeholder = placeholders[update.message.text.upper()]
-    else:
-        reply_keyboard = listas[LISTA_CATEGORIAS[0][0].upper()]
-        placeholder = placeholders[LISTA_CATEGORIAS[0][0].upper()]
+
+    reply_keyboard = DICT_SUB_CATEGORIAS[update.message.text.title()]
+    placeholder = placeholders["SUB_CATEGORIAS"]
+
     await update.message.reply_text(
         "Entendido! por favor selecione a subcategoria correspondente: Caso deseje cancelar a operação digite /cancelar",
         reply_markup=ReplyKeyboardMarkup(
@@ -99,9 +95,9 @@ async def cadastra_custo():
     conn.commit()
     conn.close()
     logger.info("Valores digitados %s, %s, %s", typed_number, categoria, sub_categoria)
-    typed_number=''
-    categoria=''
-    sub_categoria=''
+    typed_number = ''
+    categoria = ''
+    sub_categoria = ''
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
