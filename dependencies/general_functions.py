@@ -1,46 +1,16 @@
 global typed_number_var
-global categoria_var
-global sub_categoria_var
+global category_variable
+global subcategory_variable
 
-import logging
 from typing import Union
+
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.ext import (
-    ContextTypes,
-    ConversationHandler,
-    CommandHandler,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, filters
 
 from dependencies.db_connector import DBConnector
+from dependencies.environment_variables import placeholders, CATEGORIA_CUSTO, SUB_CATEGORIA_CUSTO
 
 connector = DBConnector()
-
-placeholders = {
-    "CATEGORIAS": "seleciona a categoria de custo",
-    "SUB_CATEGORIAS": "Selecione a subcategoria do custo",
-}
-
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-CATEGORIA_CUSTO, SUB_CATEGORIA_CUSTO = range(2)
-
-
-def create_conversation_handler(CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX):
-    conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.ALL, start)],
-        states={
-            CATEGORIA_CUSTO: [MessageHandler(filters.Regex(CATEGORIAS_REGEX), categoria_custo)],
-            SUB_CATEGORIA_CUSTO: [MessageHandler(filters.Regex(SUB_CATEGORIAS_REGEX), sub_categoria_custo)]
-        },
-        fallbacks=[CommandHandler("cancelar", cancel)],
-    )
-    return conv_handler
 
 
 def transforma_lista_dict_em_regex(li_di: Union[list, dict]) -> str:
@@ -61,6 +31,18 @@ LISTA_CATEGORIAS = connector.get_list_categorias()
 DICT_SUB_CATEGORIAS = connector.get_dict_sub_categorias()
 CATEGORIAS_REGEX = transforma_lista_dict_em_regex(LISTA_CATEGORIAS)
 SUB_CATEGORIAS_REGEX = transforma_lista_dict_em_regex(DICT_SUB_CATEGORIAS)
+
+
+def create_conversation_handler(regex_category: str, regex_subcategory: str) -> ConversationHandler:
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.ALL, start)],
+        states={
+            CATEGORIA_CUSTO: [MessageHandler(filters.Regex(regex_category), cost_category)],
+            SUB_CATEGORIA_CUSTO: [MessageHandler(filters.Regex(regex_subcategory), cost_subcategory)]
+        },
+        fallbacks=[CommandHandler("cancelar", cancel)],
+    )
+    return conv_handler
 
 
 async def check_number(text):
@@ -85,12 +67,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return CATEGORIA_CUSTO
 
 
-async def categoria_custo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    global categoria_var
+async def cost_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    global category_variable
     global DICT_SUB_CATEGORIAS
-    categoria_var = update.message.text
-    user = update.message.from_user
-    logger.info("Categoria de custo digitado por %s: %s", user.first_name, update.message.text)
+    category_variable = update.message.text
     reply_keyboard = DICT_SUB_CATEGORIAS[update.message.text.title()]
     placeholder = placeholders["SUB_CATEGORIAS"]
     await update.message.reply_text(
@@ -102,17 +82,15 @@ async def categoria_custo(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return SUB_CATEGORIA_CUSTO
 
 
-async def sub_categoria_custo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def cost_subcategory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global typed_number_var
-    global categoria_var
-    global sub_categoria_var
-    sub_categoria_var = update.message.text
-    user = update.message.from_user
-    logger.info("Sub categoria do custo digitado %s: %s", user.first_name, update.message.text)
-    await connector.cadastra_custo(typed_number_var, categoria_var, sub_categoria_var, logger)
+    global category_variable
+    global subcategory_variable
+    subcategory_variable = update.message.text
+    await connector.cadastra_custo(typed_number_var, category_variable, subcategory_variable)
     typed_number_var = ''
-    categoria_var = ''
-    sub_categoria_var = ''
+    category_variable = ''
+    subcategory_variable = ''
     await update.message.reply_text(
         "Maravilha o seu custo foi cadastrado com sucesso!"
     )
@@ -120,8 +98,6 @@ async def sub_categoria_custo(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    logger.info("Usuario decidiu cancelar a operação.", user.first_name)
     await update.message.reply_text(
         "Operação cancelada.", reply_markup=ReplyKeyboardRemove()
     )
@@ -135,12 +111,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     "Ou pode adicionar um novo custo digitando um numero!")
 
 
-async def add_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nm_categoria = update.message.text.replace("/add_category ", "").title().strip()
-    await connector.cadastra_categoria(nm_categoria)
-    logger.info(f"Nova categoria inserida a base {nm_categoria}")
-    await update.message.reply_text(f"Nova categoria inserida na base {nm_categoria}")
-
+def update_global_variables(context):
     global LISTA_CATEGORIAS, DICT_SUB_CATEGORIAS, CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX
     LISTA_CATEGORIAS = connector.get_list_categorias()
     DICT_SUB_CATEGORIAS = connector.get_dict_sub_categorias()
@@ -154,32 +125,23 @@ async def add_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conv_handler = create_conversation_handler(CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX)
     context.application.add_handler(conv_handler)
 
-    return LISTA_CATEGORIAS, DICT_SUB_CATEGORIAS, CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX
+
+async def add_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    nm_categoria = update.message.text.replace("/add_category ", "").title().strip()
+    await connector.cadastra_categoria(nm_categoria)
+    await update.message.reply_text(f"Nova categoria inserida na base {nm_categoria}")
+    update_global_variables(context)
 
 
 async def add_subcategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text.replace("/add_subcategory ", "").title().strip()
-    nm_categoria = texto.split("|")[0].strip()
-    nm_subcategoria = texto.split("|")[1].strip()
-    result = await connector.cadastra_subcategoria(nm_categoria, nm_subcategoria, update)
+    category_name = texto.split("|")[0].strip()
+    subcategory_name = texto.split("|")[1].strip()
+    result = await connector.cadastra_subcategoria(category_name, subcategory_name)
     if result:
-        await update.message.reply_text(f"Nova subcategoria {nm_subcategoria} inserida na base com "
-                                        f"categoria {nm_categoria}")
+        await update.message.reply_text(f"Nova subcategoria {subcategory_name} inserida na base com "
+                                        f"categoria {category_name}")
     else:
-        await update.message.reply_text(f"Não foi possivel encontrar a categoria digitada {nm_categoria}, "
+        await update.message.reply_text(f"Não foi possivel encontrar a categoria digitada {category_name}, "
                                         f"tente novamente.")
-
-    global LISTA_CATEGORIAS, DICT_SUB_CATEGORIAS, CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX
-    LISTA_CATEGORIAS = connector.get_list_categorias()
-    DICT_SUB_CATEGORIAS = connector.get_dict_sub_categorias()
-    CATEGORIAS_REGEX = transforma_lista_dict_em_regex(LISTA_CATEGORIAS)
-    SUB_CATEGORIAS_REGEX = transforma_lista_dict_em_regex(DICT_SUB_CATEGORIAS)
-
-    current_handlers = context.application.handlers[0]
-    for handler in current_handlers:
-        if isinstance(handler, ConversationHandler):
-            context.application.remove_handler(handler)
-    conv_handler = create_conversation_handler(CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX)
-    context.application.add_handler(conv_handler)
-
-    return LISTA_CATEGORIAS, DICT_SUB_CATEGORIAS, CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX
+    update_global_variables(context)
