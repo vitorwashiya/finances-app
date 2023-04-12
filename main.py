@@ -10,27 +10,7 @@ load_dotenv(dotenv_path=args.env_file)
 from dependencies.environment_variables import TOKEN_API
 from dependencies.general_functions import *
 
-from telegram import __version__ as TG_VER
-
-try:
-    from telegram import __version_info__
-except ImportError:
-    __version_info__ = (0, 0, 0, 0, 0)  # type: ignore[assignment]
-
-if __version_info__ < (20, 0, 0, "alpha", 5):
-    raise RuntimeError(
-        f"This example is not compatible with your current PTB version {TG_VER}. To view the "
-        f"{TG_VER} version of this example, "
-        f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
-    )
-
-from telegram.ext import (
-    Application,
-    CommandHandler,
-)
-
-
-
+from telegram.ext import Application, CommandHandler
 
 
 def main() -> None:
@@ -38,8 +18,7 @@ def main() -> None:
     application.add_handler(CommandHandler("add_category", add_category))
     application.add_handler(CommandHandler("add_subcategory", add_subcategory))
     application.add_handler(CommandHandler("help", help))
-    conv_handler = create_conversation_handler(CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX)
-    application.add_handler(conv_handler)
+    application.add_handler(create_conversation_handler(CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX))
     application.run_polling()
 
 
