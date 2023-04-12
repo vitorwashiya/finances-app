@@ -1,4 +1,5 @@
 import argparse
+
 from dotenv import load_dotenv
 
 parser = argparse.ArgumentParser()
@@ -8,24 +9,6 @@ load_dotenv(dotenv_path=args.env_file)
 
 from dependencies.environment_variables import TOKEN_API
 from dependencies.general_functions import *
-
-connector = DBConnector()
-
-LISTA_CATEGORIAS = connector.get_list_categorias()
-DICT_SUB_CATEGORIAS = connector.get_dict_sub_categorias()
-
-cat_list = []
-for listas in LISTA_CATEGORIAS:
-    cat_list.extend(listas)
-cat_list = list(set(cat_list))
-CATEGORIAS_REGEX = "^(" + "|".join(cat_list) + ")$"
-
-sub_cat_list = []
-for key in DICT_SUB_CATEGORIAS.keys():
-    for listas in DICT_SUB_CATEGORIAS[key]:
-        sub_cat_list.extend(listas)
-sub_cat_list = list(set(sub_cat_list))
-SUB_CATEGORIAS_REGEX = "^(" + "|".join(sub_cat_list) + ")$"
 
 from telegram import __version__ as TG_VER
 
@@ -44,25 +27,19 @@ if __version_info__ < (20, 0, 0, "alpha", 5):
 from telegram.ext import (
     Application,
     CommandHandler,
-    ConversationHandler,
-    MessageHandler,
-    filters,
 )
+
+
+
 
 
 def main() -> None:
     application = Application.builder().token(TOKEN_API).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.ALL, start)],
-        states={
-            CATEGORIA_CUSTO: [MessageHandler(filters.Regex(CATEGORIAS_REGEX), categoria_custo)],
-            SUB_CATEGORIA_CUSTO: [MessageHandler(filters.Regex(SUB_CATEGORIAS_REGEX), sub_categoria_custo)]
-        },
-        fallbacks=[CommandHandler("cancelar", cancel)],
-    )
+    application.add_handler(CommandHandler("add_category", add_category))
+    application.add_handler(CommandHandler("add_subcategory", add_subcategory))
+    application.add_handler(CommandHandler("help", help))
+    conv_handler = create_conversation_handler(CATEGORIAS_REGEX, SUB_CATEGORIAS_REGEX)
     application.add_handler(conv_handler)
-
     application.run_polling()
 
 
