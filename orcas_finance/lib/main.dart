@@ -4,7 +4,7 @@ import 'package:orcas_finance/UI/home_page.dart';
 void main() {
   runApp(
     const MaterialApp(
-      debugShowCheckedModeBanner: true,
+      debugShowCheckedModeBanner: false,
       home: HomePage(),
     ),
   );

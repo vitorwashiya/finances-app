@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:orcas_finance/models/cost.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddCostPage extends StatefulWidget {
   const AddCostPage({Key? key}) : super(key: key);
@@ -11,22 +14,24 @@ class AddCostPage extends StatefulWidget {
 class _AddCostPageState extends State<AddCostPage> {
   late TextEditingController _valueController;
 
-  Map<String, List<String>> categorySubCategoryMap = {
-    "Essencial": ["Alimento", "Transporte"],
-    "Lazer": ["Alimento", "Bar"],
-  };
-  late String _selectedCategory;
-  late String _selectedSubcategory;
+  Map<String, List<String>> _categorySubCategoryMap = {};
+  late String _selectedCategory = "";
+  late String _selectedSubcategory = "";
 
   @override
   void initState() {
     super.initState();
     _valueController = TextEditingController();
-    _selectedCategory = categorySubCategoryMap.keys.first;
-    categorySubCategoryMap[_selectedCategory]!.isNotEmpty
-        ? _selectedSubcategory =
-            categorySubCategoryMap[_selectedCategory]!.first
-        : "";
+    _loadCategorySubCategoryMap().then((value) {
+      setState(() {
+        _categorySubCategoryMap = value;
+        _selectedCategory = _categorySubCategoryMap.keys.first;
+        _selectedSubcategory =
+            _categorySubCategoryMap[_selectedCategory]!.isNotEmpty
+                ? _categorySubCategoryMap[_selectedCategory]!.first
+                : "";
+      });
+    });
   }
 
   @override
@@ -88,109 +93,147 @@ class _AddCostPageState extends State<AddCostPage> {
     );
   }
 
-  Widget _createDropdown(bool catBool) {
-    List<DropdownMenuItem<String>> dropdownItems = [];
+  Future<void> _saveCategorySubCategoryMap() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final encodedMap = json.encode(_categorySubCategoryMap);
+    prefs.setString('categorySubCategoryMap', encodedMap);
+  }
 
-    if (catBool) {
-      dropdownItems = categorySubCategoryMap.keys.map((String category) {
-        return DropdownMenuItem<String>(
-          value: category,
-          child: Text(category),
-        );
-      }).toList();
+  Future<Map<String, List<String>>> _loadCategorySubCategoryMap() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final encodedMap = prefs.getString('categorySubCategoryMap');
+    if (encodedMap != null) {
+      final decodedMap = json.decode(encodedMap) as Map<String, dynamic>;
+      return Map<String, List<String>>.fromEntries(decodedMap.entries
+          .map((e) => MapEntry(e.key, List<String>.from(e.value))));
     } else {
-      dropdownItems =
-          categorySubCategoryMap[_selectedCategory]!.map((String subcategory) {
-        return DropdownMenuItem<String>(
-          value: subcategory,
-          child: Text(subcategory),
-        );
-      }).where((item) {
-        final values = categorySubCategoryMap[_selectedCategory]!;
-        final set = Set.of(values);
-        return set.contains(item.value) &&
-            !set
-                .skipWhile((value) => value != item.value)
-                .skip(1)
-                .contains(item.value);
-      }).toList();
+      return {
+        "Essencial": ["Alimento", "Transporte"],
+        "Lazer": ["Alimento", "Bar"],
+      };
     }
+  }
 
-    return Padding(
-      padding: const EdgeInsets.all(10.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: DropdownButton<String>(
-              value: catBool ? _selectedCategory : _selectedSubcategory,
-              onChanged: (String? newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    _selectedCategory = catBool ? newValue : _selectedCategory;
-                    _selectedSubcategory = catBool
-                        ? categorySubCategoryMap[newValue]!.isNotEmpty
-                            ? categorySubCategoryMap[newValue]!.first
-                            : ""
-                        : newValue;
-                  });
-                }
-              },
-              items: dropdownItems,
-            ),
-          ),
-          const SizedBox(width: 10.0),
-          Container(
-            decoration: const BoxDecoration(
-              color: Colors.red,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: () {
-                setState(() {
-                  catBool
-                      ? categorySubCategoryMap.remove(_selectedCategory)
-                      : categorySubCategoryMap[_selectedCategory]!
-                          .remove(_selectedSubcategory);
-                  if (categorySubCategoryMap.keys.isEmpty) {
-                    categorySubCategoryMap = {
-                      "": [""]
-                    };
-                    _selectedCategory = "";
-                  } else {
-                    _selectedCategory = catBool
-                        ? categorySubCategoryMap.keys.first
-                        : _selectedCategory;
-                  }
+  Widget _createDropdown(bool catBool) {
+    return FutureBuilder(
+      future: _loadCategorySubCategoryMap(),
+      builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+        if (snapshot.hasData) {
+          {
+            List<DropdownMenuItem<String>> dropdownItems = [];
 
-                  if (categorySubCategoryMap[_selectedCategory]!.isEmpty) {
-                    categorySubCategoryMap[_selectedCategory] = [""];
-                  }
-                  _selectedSubcategory =
-                      categorySubCategoryMap[_selectedCategory]!.first;
-                });
-              },
-              icon: const Icon(
-                Icons.delete,
+            if (catBool) {
+              dropdownItems =
+                  _categorySubCategoryMap.keys.map((String category) {
+                return DropdownMenuItem<String>(
+                  value: category,
+                  child: Text(category),
+                );
+              }).toList();
+            } else {
+              dropdownItems = _categorySubCategoryMap[_selectedCategory]!
+                  .map((String subcategory) {
+                return DropdownMenuItem<String>(
+                  value: subcategory,
+                  child: Text(subcategory),
+                );
+              }).where((item) {
+                final values = _categorySubCategoryMap[_selectedCategory]!;
+                final set = Set.of(values);
+                return set.contains(item.value) &&
+                    !set
+                        .skipWhile((value) => value != item.value)
+                        .skip(1)
+                        .contains(item.value);
+              }).toList();
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButton<String>(
+                      value: catBool ? _selectedCategory : _selectedSubcategory,
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedCategory =
+                                catBool ? newValue : _selectedCategory;
+                            _selectedSubcategory = catBool
+                                ? _categorySubCategoryMap[newValue]!.isNotEmpty
+                                    ? _categorySubCategoryMap[newValue]!.first
+                                    : ""
+                                : newValue;
+                          });
+                        }
+                      },
+                      items: dropdownItems,
+                    ),
+                  ),
+                  const SizedBox(width: 10.0),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          catBool
+                              ? _categorySubCategoryMap
+                                  .remove(_selectedCategory)
+                              : _categorySubCategoryMap[_selectedCategory]!
+                                  .remove(_selectedSubcategory);
+                          if (_categorySubCategoryMap.keys.isEmpty) {
+                            _categorySubCategoryMap = {
+                              "": [""]
+                            };
+                            _selectedCategory = "";
+                          } else {
+                            _selectedCategory = catBool
+                                ? _categorySubCategoryMap.keys.first
+                                : _selectedCategory;
+                          }
+
+                          if (_categorySubCategoryMap[_selectedCategory]!
+                              .isEmpty) {
+                            _categorySubCategoryMap[_selectedCategory] = [""];
+                          }
+                          _selectedSubcategory =
+                              _categorySubCategoryMap[_selectedCategory]!.first;
+
+                          _saveCategorySubCategoryMap();
+                        });
+                      },
+                      icon: const Icon(
+                        Icons.delete,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10.0),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        _showAddPopup(catBool);
+                      },
+                      icon: const Icon(
+                        Icons.add,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(width: 10.0),
-          Container(
-            decoration: const BoxDecoration(
-              color: Colors.red,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: () {
-                _showAddPopup(catBool);
-              },
-              icon: const Icon(
-                Icons.add,
-              ),
-            ),
-          ),
-        ],
-      ),
+            );
+          }
+        } else {
+          return const CircularProgressIndicator();
+        }
+      },
     );
   }
 
@@ -218,21 +261,29 @@ class _AddCostPageState extends State<AddCostPage> {
                 if (newName != null && newName!.isNotEmpty) {
                   setState(() {
                     if (isCategory) {
-                      categorySubCategoryMap[newName!] = [""];
+                      if (_categorySubCategoryMap.keys.length == 1 &&
+                          _categorySubCategoryMap.keys.first == "") {
+                        _categorySubCategoryMap = {
+                          newName!: [""]
+                        };
+                      } else {
+                        _categorySubCategoryMap[newName!] = [""];
+                      }
                       _selectedCategory = newName!;
                       _selectedSubcategory = "";
                     } else {
-                      if (categorySubCategoryMap[_selectedCategory]!.length ==
+                      if (_categorySubCategoryMap[_selectedCategory]!.length ==
                               1 &&
-                          categorySubCategoryMap[_selectedCategory]!.first ==
+                          _categorySubCategoryMap[_selectedCategory]!.first ==
                               "") {
-                        categorySubCategoryMap[_selectedCategory] = [newName!];
+                        _categorySubCategoryMap[_selectedCategory] = [newName!];
                       } else {
-                        categorySubCategoryMap[_selectedCategory]!
+                        _categorySubCategoryMap[_selectedCategory]!
                             .add(newName!);
                       }
                       _selectedSubcategory = newName!;
                     }
+                    _saveCategorySubCategoryMap();
                   });
                 }
                 Navigator.pop(context);
